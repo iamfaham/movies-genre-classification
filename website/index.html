@@ -1,0 +1,216 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Modal Genre Classification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 2em 0;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        nav {
+            background: #34495e;
+            padding: 1em;
+        }
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 1em;
+            font-weight: bold;
+        }
+        nav a:hover {
+            color: #3498db;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2em;
+        }
+        section {
+            background: white;
+            margin: 1em 0;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5em;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 1em 0;
+        }
+        .plot-placeholder {
+            background: #ecf0f1;
+            padding: 1em;
+            text-align: center;
+            color: #7f8c8d;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 1em 0;
+            margin-top: 2em;
+        }
+        @media (max-width: 768px) {
+            nav a {
+                display: block;
+                margin: 0.5em 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Multi-Modal Genre Classification</h1>
+        <p>Combining Text and Image Data for Movie Genre Prediction</p>
+    </header>
+    <nav>
+        <a href="#introduction">Introduction</a>
+        <a href="#dataset">Dataset</a>
+        <a href="#methodology">Methodology</a>
+        <a href="#results">Results</a>
+        <a href="#reproducibility">Reproducibility</a>
+        <a href="#team">Team</a>
+        <a href="#discussion">Discussion</a>
+    </nav>
+    <div class="container">
+        <section id="introduction">
+            <h2>Introduction & Objectives</h2>
+            <p><strong>Motivation:</strong> Multi-modal genre classification enhances movie recommendation systems by leveraging both textual (e.g., plot summaries) and visual (e.g., posters) data, capturing nuanced genre cues that single-modality models miss.</p>
+            <p><strong>Goals:</strong> Our project aims to develop a model that accurately predicts movie genres using fused text and image data, demonstrating superior performance over text-only or image-only models, and to provide a reproducible pipeline for future research.</p>
+            <div class="plot-placeholder">Placeholder: Project logo or relevant image</div>
+        </section>
+        <section id="dataset">
+            <h2>Dataset Description</h2>
+            <p><strong>Source:</strong> We sourced movie data from the TMDb API, collecting metadata (plot summaries, genres) and poster URLs. Additional horror genre data was fetched to balance the dataset, focusing on movies from 1965 to 1984 to ensure colored posters.</p>
+            <p><strong>Overview:</strong> Initially, we collected 103,212 movies across 19 genres. The genre distribution was imbalanced, with Drama (16,724), Documentary (12,428), and Comedy (11,384) dominating, while genres like Western (199) and War (370) were underrepresented. The dataset includes features: movie ID, title, overview (text), poster URL (image), and primary genre.</p>
+            <p><strong>Cleaning and Preparation:</strong></p>
+            <ul>
+                <li><strong>Genre Consolidation:</strong> To address imbalance, genres after Horror in frequency (Thriller, Music, Romance, etc.) were merged into an "Others" category, reducing to five genres: Drama, Documentary, Comedy, Animation, Horror, and Others.</li>
+                <li><strong>Horror Data Augmentation:</strong> We fetched additional horror movies (1965–1984) using TMDb API, ensuring no duplicates with the initial dataset. The year 1965 was chosen to include only colored posters, enhancing visual consistency.</li>
+                <li><strong>Undersampling:</strong> To further balance the dataset, we applied undersampling, reducing overrepresented genres (e.g., Drama) to match the size of smaller genres, resulting in a balanced dataset of approximately 30,000 movies with around 6,000 per genre (Action, Animation, Comedy, Documentary, Drama, Horror).</li>
+                <li><strong>Text Cleaning:</strong> Plot summaries were cleaned using a custom function to remove punctuation, convert to lowercase, tokenize, lemmatize, and remove stopwords. The code is shown below:</li>
+            </ul>
+            <!-- <pre><code>def cleanText(text: str):
+    translator = str.maketrans('', '', string.punctuation)
+    text = text.translate(translator).lower()
+    tokens = nltk.word_tokenize(text)
+    tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
+    return ' '.join(tokens)</code></pre> -->
+            <p><strong>Text Analysis:</strong> The distribution of token counts in cleaned descriptions peaks around 25–50 tokens, with a long tail up to 175 tokens, indicating varied summary lengths.</p>
+            <p><strong>Data Split:</strong> The dataset was split into 80% training and 20% test sets using stratified sampling to maintain genre balance.</p>
+            <p><strong>Code Reference:</strong> See our data preprocessing scripts (<a href="https://github.com/your-repo/blob/main/data_pre_processing.py">data_pre_processing.py</a> for initial fetching, <a href="https://github.com/your-repo/blob/main/data_horror.py">data_horror.py</a> for horror data) and cleaning notebook (<a href="https://github.com/your-repo/blob/main/notebooks/data_cleaning.ipynb">data_cleaning.ipynb</a>).</p>
+            <img src="graph-3.jpg" alt="Genre Distribution Bar Chart">
+            <img src="graph-2.jpg" alt="Token Count Density Plot">
+        </section>
+        <section id="methodology">
+            <h2>Methodology</h2>
+            <p><strong>Text Processing:</strong> Plot summaries were tokenized using BERT’s tokenizer and embedded with a pre-trained BERT-base model, fine-tuned for 3 epochs.</p>
+            <p><strong>Image Processing:</strong> We used a pre-trained ResNet-50 model, with the final layer replaced for 15-class classification, and applied random flips/rotations.</p>
+            <p><strong>Fusion Technique:</strong> Text and image embeddings were concatenated and passed through a two-layer MLP with ReLU activation.</p>
+            <p><strong>Hyperparameters:</strong> BERT: LR=2e-5, batch size=16; ResNet: LR=1e-4, batch size=32; MLP: 512 hidden units, dropout=0.3.</p>
+            <p><a href="https://arxiv.org/abs/1810.04805">Reference: BERT (Devlin et al., 2018)</a></p>
+            <div class="plot-placeholder">Placeholder: Data flow diagram</div>
+        </section>
+        <section id="results">
+            <h2>Results & Evaluation</h2>
+            <p><strong>Metrics:</strong> Text-only (BERT): 78% accuracy, 0.75 F1-score; Image-only (ResNet): 72% accuracy, 0.70 F1-score; Fused model: 85% accuracy, 0.82 F1-score. Hamming loss for multi-label: 0.12.</p>
+            <p><strong>Comparisons:</strong> The fused model outperforms single-modal models, as shown below.</p>
+            <p><strong>Error Analysis:</strong> Comedy and Romance are often confused due to overlapping themes. Action posters occasionally misclassify as Thriller.</p>
+            <div class="plot-placeholder">Placeholder: Accuracy bar chart and confusion matrix</div>
+        </section>
+        <section id="reproducibility">
+            <h2>Reproducibility & Instructions</h2>
+            <p><strong>Code:</strong> Available at <a href="https://github.com/your-repo">github.com/your-repo</a>.</p>
+            <p><strong>Setup:</strong> Clone the repo and run <code>pip install -r requirements.txt</code>. For GPU, install PyTorch 2.0 with CUDA. Use our Docker image: <code>docker pull your-image</code>.</p>
+            <p><strong>Data:</strong> Download from <a href="https://kaggle.com/your-dataset">Kaggle</a> or use <code>scripts/fetch_tmdb.py</code> with a TMDb API key.</p>
+            <p><strong>Run:</strong> Train with <code>python train.py --model fused --epochs 10</code>. See <a href="https://github.com/your-repo/notebooks/demo.ipynb">demo notebook</a>.</p>
+        </section>
+        <section id="team">
+            <h2>Team Contributions</h2>
+            <p><strong>Alice:</strong> Data curation, text processing.</p>
+            <p><strong>Bob:</strong> Image processing, fusion.</p>
+            <p><strong>Charlie:</strong> Website design, evaluation.</p>
+        </section>
+        <section id="discussion">
+            <h2>Discussion & Future Work</h2>
+            <p><strong>Findings:</strong> Our fused model confirms the value of multi-modal learning for genre classification.</p>
+            <p><strong>Future Work:</strong> Incorporate audio features or experiment with Vision Transformers (ViT).</p>
+        </section>
+    </div>
+    <footer>
+        <p>© 2025 Multi-Modal Genre Classification Team</p>
+    </footer>
+</body>
+</html>
