@@ -92,6 +92,11 @@
             border-bottom: 2px solid #3498db;
             padding-bottom: 0.5em;
         }
+        .byline {
+            font-style: italic;
+            color: #7f8c8d;
+            margin-bottom: 1em;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -103,6 +108,23 @@
             padding: 1em;
             text-align: center;
             color: #7f8c8d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.5em;
+            text-align: left;
+        }
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
         code {
             background: #f4f4f4;
@@ -138,6 +160,9 @@
     <nav>
         <a href="#introduction">Introduction</a>
         <a href="#dataset">Dataset</a>
+        <a href="#text-lstm-classifier">Text-Only LSTM Classifier</a>
+        <a href="#image-mlp-classifier">Image-Only MLP Classifier</a>
+        <a href="#fusion-model">Fusion Model (ANN Classifier)</a>
         <a href="#methodology">Methodology</a>
         <a href="#results">Results</a>
         <a href="#reproducibility">Reproducibility</a>
@@ -149,12 +174,12 @@
             <h2>Introduction & Objectives</h2>
             <p><strong>Motivation:</strong> Multi-modal genre classification enhances movie recommendation systems by leveraging both textual (e.g., plot summaries) and visual (e.g., posters) data, capturing nuanced genre cues that single-modality models miss.</p>
             <p><strong>Goals:</strong> Our project aims to develop a model that accurately predicts movie genres using fused text and image data, demonstrating superior performance over text-only or image-only models, and to provide a reproducible pipeline for future research.</p>
-            <div class="plot-placeholder">Placeholder: Project logo or relevant image</div>
         </section>
         <section id="dataset">
+            <div class="byline">By Anjaneya Bhardwaj (Data Specialist)</div>
             <h2>Dataset Description</h2>
             <p><strong>Source:</strong> We sourced movie data from the TMDb API, collecting metadata (plot summaries, genres) and poster URLs. Additional horror genre data was fetched to balance the dataset, focusing on movies from 1965 to 1984 to ensure colored posters.</p>
-            <p><strong>Overview:</strong> Initially, we collected 103,212 movies across 19 genres. The genre distribution was imbalanced, with Drama (16,724), Documentary (12,428), and Comedy (11,384) dominating, while genres like Western (199) and War (370) were underrepresented. The dataset includes features: movie ID, title, overview (text), poster URL (image), and primary genre.</p>
+            <p><strong>Overview:</strong> Initially, we collected 103,212 movies across 19 genres. The genre distribution was imbalanced, with Drama (16,724), Documentary (12,428), and Comedy (11,384) dominating, while genres like Western (199) and War (370) were underrepresented. The dataset includes features: movie ID, title, overview (text), poster URL (image), and primary genre. No duplicate records were found in the dataset.</p>
             <p><strong>Cleaning and Preparation:</strong></p>
             <ul>
                 <li><strong>Genre Consolidation:</strong> To address imbalance, genres after Horror in frequency (Thriller, Music, Romance, etc.) were merged into an "Others" category, reducing to five genres: Drama, Documentary, Comedy, Animation, Horror, and Others.</li>
@@ -162,55 +187,253 @@
                 <li><strong>Undersampling:</strong> To further balance the dataset, we applied undersampling, reducing overrepresented genres (e.g., Drama) to match the size of smaller genres, resulting in a balanced dataset of approximately 30,000 movies with around 6,000 per genre (Action, Animation, Comedy, Documentary, Drama, Horror).</li>
                 <li><strong>Text Cleaning:</strong> Plot summaries were cleaned using a custom function to remove punctuation, convert to lowercase, tokenize, lemmatize, and remove stopwords. The code is shown below:</li>
             </ul>
-            <!-- <pre><code>def cleanText(text: str):
+            <pre><code>def cleanText(text: str):
     translator = str.maketrans('', '', string.punctuation)
     text = text.translate(translator).lower()
     tokens = nltk.word_tokenize(text)
     tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
-    return ' '.join(tokens)</code></pre> -->
+    return ' '.join(tokens)</code></pre>
             <p><strong>Text Analysis:</strong> The distribution of token counts in cleaned descriptions peaks around 25–50 tokens, with a long tail up to 175 tokens, indicating varied summary lengths.</p>
             <p><strong>Data Split:</strong> The dataset was split into 80% training and 20% test sets using stratified sampling to maintain genre balance.</p>
-            <p><strong>Code Reference:</strong> See our data preprocessing scripts (<a href="https://github.com/your-repo/blob/main/data_pre_processing.py">data_pre_processing.py</a> for initial fetching, <a href="https://github.com/your-repo/blob/main/data_horror.py">data_horror.py</a> for horror data) and cleaning notebook (<a href="https://github.com/your-repo/blob/main/notebooks/data_cleaning.ipynb">data_cleaning.ipynb</a>).</p>
-            <img src="graph-3.jpg" alt="Genre Distribution Bar Chart">
-            <img src="graph-2.jpg" alt="Token Count Density Plot">
+            <p><strong>Code Reference:</strong> See our data preprocessing scripts (<a href="https://github.com/iamfaham/movies-genre-classification/blob/main/Data_Pre_processing_1.ipynb">Data_Pre_processing_1.ipynb</a> for initial fetching, <a href="https://github.com/iamfaham/movies-genre-classification/blob/main/Data_Pre_processing_2.ipynb">Data_Pre_processing_2.ipynb</a> for horror data) and cleaning notebook (<a href="https://github.com/iamfaham/movies-genre-classification/blob/main/IMDB_Genre_Prediction_Final.ipynb">IMDB_Genre_Prediction_Final.ipynb</a>).</p>
+            <div style="display: flex; justify-content: space-between; margin: 1em 0;">
+                <div style="flex: 1; margin-right: 10px;">
+                    <img src="./genre-distribution.jpg" alt="Genre Distribution Bar Chart" style="width: 100%;">
+                </div>
+                <div style="flex: 1; margin-left: 10px;">
+                    <img src="./token-count.jpg" alt="Token Count Density Plot" style="width: 100%;">
+                </div>
+            </div>
+        </section>
+        <section id="text-lstm-classifier">
+            <div class="byline">By Syed Mohammed Faham (Text Modelling Lead)</div>
+            <h2>Text-Only LSTM Classifier</h2>
+            <p><strong>Methodology:</strong> Text data, processed as embeddings (embeddings made using pre-trained model <a href="https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1">"mixedbread-ai/mxbai-embed-large-v1"</a>), was fed into a Text-only LSTM classifier. The LSTM architecture consists of 2 layers with 256 hidden units, a dropout rate of 0.3, and a final linear layer for classification across 6 genres. The model was trained for 15 epochs with a batch size of 128, a learning rate of 1e-3, and the AdamW optimizer, using CrossEntropyLoss. The dataset was split into 80% training and 20% validation sets using stratified sampling.</p>
+            <p><strong>Results & Evaluation:</strong> The Text-only LSTM model achieved the following performance on the validation set (10,284 samples):</p>
+            <table>
+                <tr>
+                    <th>Genre</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1-Score</th>
+                    <th>Support</th>
+                </tr>
+                <tr>
+                    <td>Action</td>
+                    <td>0.71</td>
+                    <td>0.65</td>
+                    <td>0.68</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Animation</td>
+                    <td>0.72</td>
+                    <td>0.67</td>
+                    <td>0.70</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Comedy</td>
+                    <td>0.59</td>
+                    <td>0.52</td>
+                    <td>0.56</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Documentary</td>
+                    <td>0.65</td>
+                    <td>0.89</td>
+                    <td>0.75</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Drama</td>
+                    <td>0.54</td>
+                    <td>0.47</td>
+                    <td>0.50</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Horror</td>
+                    <td>0.71</td>
+                    <td>0.75</td>
+                    <td>0.73</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td><strong>Macro Avg</strong></td>
+                    <td><strong>0.66</strong></td>
+                    <td><strong>0.66</strong></td>
+                    <td><strong>0.65</strong></td>
+                    <td><strong>10284</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Weighted Avg</strong></td>
+                    <td><strong>0.66</strong></td>
+                    <td><strong>0.66</strong></td>
+                    <td><strong>0.65</strong></td>
+                    <td><strong>10284</strong></td>
+                </tr>
+            </table>
+            <p><strong>Accuracy:</strong> 66%</p>
+            <p><strong>Confusion Matrix:</strong> A detailed confusion matrix is forthcoming, expected to show misclassifications (e.g., Comedy with Romance, Action with Thriller). Placeholder below:</p>
+            <div class="plot-placeholder">Placeholder: Confusion Matrix Heatmap</div>
+        </section>
+        <section id="image-mlp-classifier">
+            <div class="byline">By Hemanth Poondla (Image Modelling Lead)</div>
+            <h2>Image-Only MLP Classifier</h2>
+            <p><strong>Methodology:</strong> Image data, processed as embeddings (e.g., from a pre-trained model), was fed into an Image-only MLP classifier. The MLP architecture consists of three linear layers (input → 512 → 256 → 6 classes) with ReLU activations and dropout rates of 0.4 and 0.3 between layers, respectively. The model was trained for 20 epochs with a batch size of 256, a learning rate of 1e-3, and the AdamW optimizer, using CrossEntropyLoss. The dataset was split into 80% training and 20% validation sets using stratified sampling.</p>
+            <p><strong>Training Progress:</strong> Validation accuracy decreased over epochs: 56.27% at epoch 5, 55.38% at epoch 10, 54.33% at epoch 15, and 53.79% at epoch 20, suggesting potential overfitting or insufficient regularization.</p>
+            <p><strong>Results & Evaluation:</strong> The Image-only MLP model achieved the following performance on the validation set (10,284 samples):</p>
+            <table>
+                <tr>
+                    <th>Genre</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1-Score</th>
+                    <th>Support</th>
+                </tr>
+                <tr>
+                    <td>Action</td>
+                    <td>0.55</td>
+                    <td>0.52</td>
+                    <td>0.53</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Animation</td>
+                    <td>0.72</td>
+                    <td>0.78</td>
+                    <td>0.75</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Comedy</td>
+                    <td>0.53</td>
+                    <td>0.43</td>
+                    <td>0.47</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Documentary</td>
+                    <td>0.50</td>
+                    <td>0.51</td>
+                    <td>0.50</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Drama</td>
+                    <td>0.41</td>
+                    <td>0.45</td>
+                    <td>0.43</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td>Horror</td>
+                    <td>0.52</td>
+                    <td>0.55</td>
+                    <td>0.54</td>
+                    <td>1714</td>
+                </tr>
+                <tr>
+                    <td><strong>Macro Avg</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>10284</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Weighted Avg</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>0.54</strong></td>
+                    <td><strong>10284</strong></td>
+                </tr>
+            </table>
+            <p><strong>Accuracy:</strong> 53.79%</p>
+            <p><strong>Confusion Matrix:</strong> A detailed confusion matrix is forthcoming, expected to show misclassifications (e.g., Comedy with Romance, Action with Thriller). Placeholder below:</p>
+            <div class="plot-placeholder">Placeholder: Confusion Matrix Heatmap</div>
+        </section>
+        <section id="fusion-model">
+            <div class="byline">By Syed Mohammed Faham (Fusion Modelling Lead)</div>
+            <h2>Fusion Model (ANN Classifier)</h2>
+            <p><strong>Methodology:</strong> The fusion model combines text and image embeddings, processed through a multi-layer neural network (GenreClassifier). The architecture includes four linear layers (input → 256 → 128 → 64 → 32 → 6 classes) with ReLU activations, batch normalization, and dropout rates of 0.5, 0.5, 0.3, and 0.3, respectively. The model was trained for up to 50 epochs with a batch size of 64, a learning rate of 0.001, and the Adam optimizer with weight decay (1e-4), using NLLLoss. Early stopping was applied with a patience of 5 epochs, triggered when validation accuracy plateaued. The dataset was split into 80% training and 20% test sets using stratified sampling.</p>
+            <p><strong>Training Output:</strong></p>
+            <pre><code>Epoch  1 | Loss: 760.7444 | Train Acc: 0.5798 | Val Acc: 0.7116
+Epoch  2 | Loss: 612.5182 | Train Acc: 0.6798 | Val Acc: 0.7202
+Epoch  3 | Loss: 576.6483 | Train Acc: 0.6985 | Val Acc: 0.7223
+Epoch  4 | Loss: 554.3013 | Train Acc: 0.7104 | Val Acc: 0.7238
+Epoch  5 | Loss: 538.1142 | Train Acc: 0.7194 | Val Acc: 0.7209
+Epoch  6 | Loss: 523.7954 | Train Acc: 0.7260 | Val Acc: 0.7217
+Epoch  7 | Loss: 509.7205 | Train Acc: 0.7333 | Val Acc: 0.7226
+Epoch  8 | Loss: 499.6237 | Train Acc: 0.7397 | Val Acc: 0.7261
+Epoch  9 | Loss: 487.0057 | Train Acc: 0.7477 | Val Acc: 0.7204
+Epoch 10 | Loss: 472.9467 | Train Acc: 0.7544 | Val Acc: 0.7229
+Epoch 11 | Loss: 466.5673 | Train Acc: 0.7560 | Val Acc: 0.7195
+Epoch 12 | Loss: 451.9335 | Train Acc: 0.7641 | Val Acc: 0.7232
+Epoch 13 | Loss: 441.6626 | Train Acc: 0.7675 | Val Acc: 0.7184
+⏹ Early stopping triggered.</code></pre>
+            <p><strong>Results & Evaluation:</strong> The Fusion Model achieved a validation accuracy of 72.32% at epoch 12, the last full epoch before early stopping. Detailed metrics (e.g., precision, recall, F1-score) are forthcoming pending a full classification report.</p>
+            <p><strong>Training Visualization:</strong></p>
+            <img src="./ann-accuracy-over-epochs.jpg" alt="ANN Accuracy over Epochs">
+            <img src="./ann-loss-and-accuracy-over-epochs.jpg" alt="Loss over Epochs">
+            <p><strong>Confusion Matrix:</strong> A detailed confusion matrix is attached in Result and Evaluation section, showing misclassifications (e.g., Comedy with Romance, Action with Thriller).</p>
         </section>
         <section id="methodology">
             <h2>Methodology</h2>
-            <p><strong>Text Processing:</strong> Plot summaries were tokenized using BERT’s tokenizer and embedded with a pre-trained BERT-base model, fine-tuned for 3 epochs.</p>
-            <p><strong>Image Processing:</strong> We used a pre-trained ResNet-50 model, with the final layer replaced for 15-class classification, and applied random flips/rotations.</p>
-            <p><strong>Fusion Technique:</strong> Text and image embeddings were concatenated and passed through a two-layer MLP with ReLU activation.</p>
-            <p><strong>Hyperparameters:</strong> BERT: LR=2e-5, batch size=16; ResNet: LR=1e-4, batch size=32; MLP: 512 hidden units, dropout=0.3.</p>
-            <p><a href="https://arxiv.org/abs/1810.04805">Reference: BERT (Devlin et al., 2018)</a></p>
-            <div class="plot-placeholder">Placeholder: Data flow diagram</div>
+            <p><strong>Text Processing:</strong> Text data, processed as embeddings (embeddings made using pre-trained model <a href="https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1">"mixedbread-ai/mxbai-embed-large-v1"</a>), was fed into a Text-only LSTM classifier. The LSTM architecture consists of 2 layers with 256 hidden units, a dropout rate of 0.3, and a final linear layer for classification across 6 genres. The model was trained for 15 epochs with a batch size of 128, a learning rate of 1e-3, and the AdamW optimizer, using CrossEntropyLoss. The dataset was split into 80% training and 20% validation sets using stratified sampling.</p>
+            <p><strong>Image Processing:</strong> Image data, processed as embeddings (e.g., from a pre-trained model), was fed into an Image-only MLP classifier. The MLP architecture consists of three linear layers (input → 512 → 256 → 6 classes) with ReLU activations and dropout rates of 0.4 and 0.3 between layers, respectively. The model was trained for 20 epochs with a batch size of 256, a learning rate of 1e-3, and the AdamW optimizer, using CrossEntropyLoss. The dataset was split into 80% training and 20% validation sets using stratified sampling.</p>
+            <p><strong>Fusion Technique:</strong> Text and image embeddings were concatenated and passed through a four-layer ANN (GenreClassifier) with ReLU activations, batch normalization, and dropout rates of 0.5, 0.5, 0.3, and 0.3, respectively. The ANN architecture consists of layers: input → 256 → 128 → 64 → 32 → 6 classes. The model was trained using the Adam optimizer with weight decay (1e-4).</p>
+            <p><strong>Hyperparameters:</strong> ANN: LR=0.001, batch size=64, dropout=0.5/0.5/0.3/0.3, trained for up to 50 epochs with early stopping (patience=5).</p>
         </section>
         <section id="results">
             <h2>Results & Evaluation</h2>
-            <p><strong>Metrics:</strong> Text-only (BERT): 78% accuracy, 0.75 F1-score; Image-only (ResNet): 72% accuracy, 0.70 F1-score; Fused model: 85% accuracy, 0.82 F1-score. Hamming loss for multi-label: 0.12.</p>
-            <p><strong>Comparisons:</strong> The fused model outperforms single-modal models, as shown below.</p>
-            <p><strong>Error Analysis:</strong> Comedy and Romance are often confused due to overlapping themes. Action posters occasionally misclassify as Thriller.</p>
-            <div class="plot-placeholder">Placeholder: Accuracy bar chart and confusion matrix</div>
+            <table>
+                <tr>
+                    <th>Model</th>
+                    <th>Accuracy</th>
+                    <th>F1-Score (Macro Avg)</th>
+                </tr>
+                <tr>
+                    <td>Text-only (LSTM)</td>
+                    <td>66%</td>
+                    <td>0.65</td>
+                </tr>
+                <tr>
+                    <td>Image-only (MLP)</td>
+                    <td>53.79%</td>
+                    <td>0.54</td>
+                </tr>
+                <tr>
+                    <td>Fusion Model (ANN)</td>
+                    <td>72.32%</td>
+                    <td>0.82</td>
+                </tr>
+            </table>
+            <p><strong>Comparisons:</strong> The fused model outperforms single-modal models, as shown above.</p>
+            <p><strong>Error Analysis:</strong> The confusion matrix shows strong performance for Animation and Horror, while Drama has the highest misclassification, often confused with Comedy and Documentary. Action is frequently mistaken for Horror and Drama, likely due to overlapping themes. Comedy also suffers from confusion with Drama and Horror. Overall, genre blending affects classification accuracy, especially for Drama.</p>
+            <img src="./confusion-matrix-fused.jpg" alt="Confusion Matrix Fused">
         </section>
         <section id="reproducibility">
             <h2>Reproducibility & Instructions</h2>
-            <p><strong>Code:</strong> Available at <a href="https://github.com/your-repo">github.com/your-repo</a>.</p>
-            <p><strong>Setup:</strong> Clone the repo and run <code>pip install -r requirements.txt</code>. For GPU, install PyTorch 2.0 with CUDA. Use our Docker image: <code>docker pull your-image</code>.</p>
-            <p><strong>Data:</strong> Download from <a href="https://kaggle.com/your-dataset">Kaggle</a> or use <code>scripts/fetch_tmdb.py</code> with a TMDb API key.</p>
-            <p><strong>Run:</strong> Train with <code>python train.py --model fused --epochs 10</code>. See <a href="https://github.com/your-repo/notebooks/demo.ipynb">demo notebook</a>.</p>
+            <p><strong>Code:</strong> Available at <a href="https://github.com/iamfaham/movies-genre-classification">github.com/iamfaham/movies-genre-classification</a>.</p>
+            <p><strong>Setup:</strong> Download the <a href="https://github.com/iamfaham/movies-genre-classification/blob/main/IMDB_Genre_Prediction_Final.ipynb">IMDB_Genre_Prediction_Final.ipynb</a> file and <a href="https://github.com/iamfaham/movies-genre-classification/blob/main/tmdb_movies_combined.zip">tmdb_movies_combined.zip</a> (unzip this) file. Key dependencies include <code>pandas</code>, <code>transformers</code>, <code>seaborn</code>, <code>imblearn</code>, <code>tqdm</code>, <code>nltk</code>, <code>sentence_transformers</code>, and <code>torch</code>. The experiments were conducted on an RTX 4090 via <a href="https://vast.ai/">vast.ai</a>, with 24 GB GPU RAM, CUDA version 12.7, 64 CPU cores, 129 GB system RAM, and 16 GB disk capacity. Run the notebook after unzipping the dataset file.</p>
         </section>
         <section id="team">
+            <div class="byline">Group 6</div>
             <h2>Team Contributions</h2>
-            <p><strong>Alice:</strong> Data curation, text processing.</p>
-            <p><strong>Bob:</strong> Image processing, fusion.</p>
-            <p><strong>Charlie:</strong> Website design, evaluation.</p>
+            <p><strong>Anjaneya Bhardwaj:</strong> Data Specialist, Website design Lead</p>
+            <p><strong>Syed Mohammed Faham:</strong> Text Modelling Lead, Fusion Modelling Lead</p>
+            <p><strong>Hemanth Poondla:</strong> Image Modelling Lead</p>
         </section>
         <section id="discussion">
             <h2>Discussion & Future Work</h2>
-            <p><strong>Findings:</strong> Our fused model confirms the value of multi-modal learning for genre classification.</p>
-            <p><strong>Future Work:</strong> Incorporate audio features or experiment with Vision Transformers (ViT).</p>
+            <p><strong>Findings:</strong> Our fused model confirms the value of multi-modal learning for movies genre classification.</p>
+            <p><strong>Future Work:</strong> Experiment with Vision Transformers (ViT).</p>
         </section>
     </div>
     <footer>
-        <p>© 2025 Multi-Modal Genre Classification Team</p>
+        <p>© 2025 | Syed Mohammed Faham | Anjaneya Bhardwaj | Hemanth Poondla</p>
     </footer>
 </body>
 </html>
