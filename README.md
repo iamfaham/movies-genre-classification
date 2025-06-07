@@ -93,7 +93,7 @@ The model and app are hosted on Hugging Face:
 - This project started as an exploration using **text-only** and **image-only** pipelines.
 - Results significantly improved when we **fused both modalities** into a single classifier — and we stuck with that.
 - No fine-tuning was done on the embedding models; only the classifier was trained end-to-end.
-- If the .ipynb file does no open in github, check it out on [Google Colab](https://colab.research.google.com/drive/17WX3s4wscZutTN7J5xtV2un8UTwfwRqz?usp=sharing) 
+- If the IMDB_Genre_Prediction_Final.ipynb file does not open on github, check it out on [Google Colab](https://colab.research.google.com/drive/17WX3s4wscZutTN7J5xtV2un8UTwfwRqz?usp=sharing) 
 
 ---
 
